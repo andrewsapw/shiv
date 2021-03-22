@@ -121,26 +121,50 @@ def copytree(src: Path, dst: Path) -> None:
             shutil.copy2(str(path), str(dst / path.relative_to(src)))
 
 
-@click.command(context_settings=dict(help_option_names=["-h", "--help", "--halp"], ignore_unknown_options=True))
+@click.command(
+    context_settings=dict(
+        help_option_names=["-h", "--help", "--halp"], ignore_unknown_options=True
+    )
+)
 @click.version_option(version=__version__, prog_name="shiv")
 @click.option(
-    "--entry-point", "-e", default=None, help="The entry point to invoke (takes precedence over --console-script)."
+    "--entry-point",
+    "-e",
+    default=None,
+    help="The entry point to invoke (takes precedence over --console-script).",
 )
-@click.option("--console-script", "-c", default=None, help="The console_script to invoke.")
-@click.option("--output-file", "-o", help="The path to the output file for shiv to create.")
-@click.option("--python", "-p", help="The python interpreter to set as the shebang (such as '/usr/bin/env python3')")
+@click.option(
+    "--console-script", "-c", default=None, help="The console_script to invoke."
+)
+@click.option(
+    "--output-file", "-o", help="The path to the output file for shiv to create."
+)
+@click.option(
+    "--python",
+    "-p",
+    help="The python interpreter to set as the shebang (such as '/usr/bin/env python3')",
+)
 @click.option(
     "--site-packages",
     help="The path to an existing site-packages directory to copy into the zipapp.",
     type=click.Path(exists=True),
     multiple=True,
 )
-@click.option("--compressed/--uncompressed", default=True, help="Whether or not to compress your zip.")
 @click.option(
-    "--compile-pyc", is_flag=True, help="Whether or not to compile pyc files during initial bootstrap.",
+    "--compressed/--uncompressed",
+    default=True,
+    help="Whether or not to compress your zip.",
 )
 @click.option(
-    "--extend-pythonpath", "-E", is_flag=True, help="Add the contents of the zipapp to PYTHONPATH (for subprocesses).",
+    "--compile-pyc",
+    is_flag=True,
+    help="Whether or not to compile pyc files during initial bootstrap.",
+)
+@click.option(
+    "--extend-pythonpath",
+    "-E",
+    is_flag=True,
+    help="Add the contents of the zipapp to PYTHONPATH (for subprocesses).",
 )
 @click.option(
     "--reproducible",
@@ -168,7 +192,16 @@ def copytree(src: Path, dst: Path) -> None:
         "but before invoking your entry point."
     ),
 )
-@click.option("--root", type=click.Path(), help="Override the 'root' path (default is ~/.shiv).")
+@click.option(
+    "--build_id",
+    type=click.STRING,
+    help=(
+        "Specifies additional name to zipapp folder inside .shiv SHIV_ROOT directory."
+    ),
+)
+@click.option(
+    "--root", type=click.Path(), help="Override the 'root' path (default is ~/.shiv)."
+)
 @click.argument("pip_args", nargs=-1, type=click.UNPROCESSED)
 def main(
     output_file: str,
@@ -182,6 +215,7 @@ def main(
     reproducible: bool,
     no_modify: bool,
     preamble: Optional[str],
+    build_id: Optional[str],
     root: Optional[str],
     pip_args: List[str],
 ) -> None:
@@ -200,7 +234,11 @@ def main(
     for disallowed in DISALLOWED_ARGS:
         for supplied_arg in pip_args:
             if supplied_arg in disallowed:
-                sys.exit(DISALLOWED_PIP_ARGS.format(arg=supplied_arg, reason=DISALLOWED_ARGS[disallowed]))
+                sys.exit(
+                    DISALLOWED_PIP_ARGS.format(
+                        arg=supplied_arg, reason=DISALLOWED_ARGS[disallowed]
+                    )
+                )
 
     sources: List[Path] = []
 
@@ -233,7 +271,9 @@ def main(
 
             for source in sources:
                 for path in source.rglob("**/*.py"):
-                    hashes[str(path.relative_to(source))] = hashlib.sha256(path.read_bytes()).hexdigest()
+                    hashes[str(path.relative_to(source))] = hashlib.sha256(
+                        path.read_bytes()
+                    ).hexdigest()
 
         # if entry_point is a console script, get the callable
         if entry_point is None and console_script is not None:
@@ -246,12 +286,17 @@ def main(
         # Some projects need reproducible artifacts, so they can use SOURCE_DATE_EPOCH
         # environment variable to specify the timestamps in the zipapp.
         timestamp = int(
-            os.environ.get(SOURCE_DATE_EPOCH_ENV, SOURCE_DATE_EPOCH_DEFAULT if reproducible else time.time())
+            os.environ.get(
+                SOURCE_DATE_EPOCH_ENV,
+                SOURCE_DATE_EPOCH_DEFAULT if reproducible else time.time(),
+            )
         )
 
         # create runtime environment metadata
         env = Environment(
-            built_at=datetime.utcfromtimestamp(timestamp).strftime(BUILD_AT_TIMESTAMP_FORMAT),
+            built_at=datetime.utcfromtimestamp(timestamp).strftime(
+                BUILD_AT_TIMESTAMP_FORMAT
+            ),
             entry_point=entry_point,
             script=console_script,
             compile_pyc=compile_pyc,
@@ -260,6 +305,7 @@ def main(
             no_modify=no_modify,
             reproducible=reproducible,
             preamble=Path(preamble).name if preamble else None,
+            build_id=build_id,
             root=root,
         )
 
